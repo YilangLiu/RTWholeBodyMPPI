@@ -208,3 +208,15 @@ whole-boyd_mppi/
 
 ## License
 This project is licensed under the [MIT License](./LICENSE). Feel free to use, modify, and distribute this code.
+
+## Citation
+If you find this code useful, please consider citing our paper:
+```
+@article{alvarez2024realtime,
+        title={Real-Time Whole-Body Control of Legged Robots with Model-Predictive Path Integral Control},
+        author={Alvarez-Padilla, Juan and Zhang, John Z. and Kwok, Sofia and Dolan, John M. and Manchester, Zachary},
+        year={2024},
+        journal={arXiv preprint arXiv:2409.10469},
+        note={Available at: \url{https://arxiv.org/abs/2409.10469}}
+      }
+```

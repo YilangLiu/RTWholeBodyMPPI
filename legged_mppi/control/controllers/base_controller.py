@@ -39,7 +39,7 @@ class BaseMPPI:
         self.n_samples = params['n_samples']
         self.noise_sigma = np.array(params['noise_sigma'])
         self.num_workers = params['n_workers']
-        self.sampling_init = np.array([-0.3, 1.34, -2.83, 0.3, 1.34, -2.83] * 2)
+        self.sampling_init = self.model.keyframe("stand").qpos[7:] # np.array([-0.3, 1.34, -2.83, 0.3, 1.34, -2.83] * 2)
 
         # Initialize rollouts and sampling configurations
         self.h = params['dt']
@@ -69,17 +69,6 @@ class BaseMPPI:
         self.trajectory = np.zeros((self.horizon, self.act_dim))
         self.trajectory += self.sampling_init
 
-    def sample_delta_u(self):
-        if self.sample_type == 'normal':
-            size = (self.n_samples, self.horizon, self.act_dim)
-            return self.generate_noise(size)
-        elif self.sample_type == 'cubic':
-            indices = np.arange(self.n_knots)*self.horizon//self.n_knots
-            size = (self.n_samples, self.n_knots, self.act_dim)
-            knot_points = self.generate_noise(size)
-            cubic_spline = CubicSpline(indices, knot_points, axis=1)
-            return cubic_spline(np.arange(self.horizon))
-        
     def perturb_action(self):
         if self.sample_type == 'normal':
             size = (self.n_samples, self.horizon, self.act_dim)
@@ -98,6 +87,30 @@ class BaseMPPI:
             actions = cubic_spline(np.arange(self.horizon))
             actions = np.clip(actions, self.act_min, self.act_max)
             return actions
+        
+        elif self.sample_type == 'mode_sampling':
+            noise = np.zeros((self.n_samples, self.horizon, self.act_dim))
+            # sampled_u_value = self.random_generator.choice(np.arange(-0.5, 0.5, 0.01), size = (self.n_samples, self.act_dim))
+            sampled_u_value = self.generate_noise((self.n_samples, self.act_dim)) 
+            sampled_ctrl_time = self.random_generator.integers(0, self.horizon-1, size=(self.n_samples, self.act_dim))
+            sampled_ctrl_duration = self.random_generator.integers(0, self.horizon - sampled_ctrl_time + 1, size=(self.n_samples, self.act_dim))
+            for idx in range(self.n_samples):
+                for k in range(self.act_dim):
+                    noise[idx,sampled_ctrl_time[idx,k]:sampled_ctrl_time[idx,k]+sampled_ctrl_duration[idx,k], k] = sampled_u_value[idx, k]
+            
+            # indices_float = np.linspace(0, self.horizon - 1, num=self.n_knots)
+            # indices = np.round(indices_float).astype(int)
+            
+            # mode_sample_indices = np.arange(self.n_knots)
+            # sampled_ctrl_time = self.random_generator.choice(mode_sample_indices, size=(self.n_samples, self.act_dim))
+            # sampled_ctrl_end_time = self.random_generator.integers(0, self.n_knots - sampled_ctrl_time, size=(self.n_samples, self.act_dim))
+            # for idx in range(self.n_samples):
+            #     for k in range(self.act_dim):
+            #         noise[idx,indices[sampled_ctrl_time[idx,k]]:indices[sampled_ctrl_end_time[idx,k]], k] = sampled_u_value[idx, k]
+            
+            actions = self.trajectory + noise
+            actions = np.clip(actions, self.act_min, self.act_max)
+            return actions 
         
     def generate_noise(self, size):
         """

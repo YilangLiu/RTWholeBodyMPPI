@@ -1,6 +1,8 @@
 import numpy as np
 from interface.simulator import Simulator
 from control.controllers.mppi_locomotion import MPPI
+from control.controllers.bipedal_loco import Bipedal
+from control.controllers.mode_sampling_locomotion import Mode_Sampling
 from utils.tasks import get_task
 
 import argparse
@@ -25,7 +27,7 @@ def main(task):
     sim_path = task_data["sim_path"]
 
     # Initialize agent and simulator
-    agent = MPPI(task=task)
+    agent = Bipedal(task=task)
     agent.set_params(horizon=CTRL_HORIZON, lambda_=CTRL_LAMBDA, N=CTRL_N_SAMPLES)
     simulator = Simulator(agent=agent, viewer=VIEWER, T=T, dt=SIMULATION_STEP, timeconst=TIMECONST,
                           dampingratio=DAMPINGRATIO, model_path=sim_path, ctrl_rate=CTRL_UPDATE_RATE)
@@ -36,7 +38,7 @@ def main(task):
 
 if __name__ == "__main__":
     # Define valid tasks
-    VALID_TASKS = ['stairs', 'walk_octagon', 'walk_straight', 'big_box']
+    VALID_TASKS = ['stairs', 'walk_octagon', 'walk_straight', 'big_box', 'hopturn', 'bipedal', 'stand', 'walk']
 
     # Parse arguments
     parser = argparse.ArgumentParser(description="Run simulation with a specified task.")

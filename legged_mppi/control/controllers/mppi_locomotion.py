@@ -9,13 +9,14 @@ from control.controllers.base_controller import BaseMPPI
 from control.gait_scheduler.scheduler import GaitScheduler
 from control.gait_scheduler.scheduler import Timer
 from utils.transforms import batch_world_to_local_velocity, calculate_orientation_quaternion
+import time 
 
 # Define base directory and paths for resource files
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 GAIT_DIR = os.path.join(BASE_DIR, "../gait_scheduler/gaits/")
 
 # Paths for gait files
-GAIT_INPLACE_PATH = os.path.join(GAIT_DIR, "FAST/walking_gait_raibert_FAST_0_0_10cm_100hz.tsv")
+GAIT_INPLACE_PATH = os.path.join(GAIT_DIR, "SLOW/walking_gait_raibert_SLOW_0_0_10cm_100hz.tsv")
 GAIT_TROT_PATH = os.path.join(GAIT_DIR, "MED/walking_gait_raibert_MED_0_5_15cm_100hz.tsv")
 GAIT_WALK_PATH = os.path.join(GAIT_DIR, "MED/walking_gait_raibert_MED_0_1_10cm_100hz.tsv")
 GAIT_WALK_FAST_PATH = os.path.join(GAIT_DIR, "FAST/walking_gait_raibert_FAST_0_1_10cm_100hz.tsv")
@@ -89,10 +90,10 @@ class MPPI(BaseMPPI):
                                         self.goal_ori[self.goal_index],
                                         self.cmd_vel[self.goal_index],
                                         np.zeros(4)))
-        
+
         self.gait_scheduler = self.gaits[self.desired_gait[self.goal_index]]
         self.task_success = False
-
+        
         # Debug information
         print(f"Initial goal {self.goal_index}: {self.goal_pos[self.goal_index] }")
         print(f"Initial gait {self.desired_gait[self.goal_index]}")
@@ -108,6 +109,7 @@ class MPPI(BaseMPPI):
             # Move to the next goal
             self.goal_index += 1
             self.body_ref[:3] = self.goal_pos[self.goal_index]
+            self.body_ref[3:7] = self.goal_ori[self.goal_index]
             self.body_ref[7:9] = self.cmd_vel[self.goal_index]
             self.gait_scheduler = self.gaits[self.desired_gait[self.goal_index]]
             self.timer.reset()
@@ -144,16 +146,16 @@ class MPPI(BaseMPPI):
         self.obs = obs
 
         # Calculate the direction and distance to the goal
-        direction = self.body_ref[:3] - obs[:3]
-        goal_delta = np.linalg.norm(direction)
+        # direction = self.body_ref[:3] - obs[:3]
+        # goal_delta = np.linalg.norm(direction)
 
         # Update desired orientation based on the goal position
-        if goal_delta > 0.1 and not self.timer.waiting:
-            self.goal_ori = calculate_orientation_quaternion(obs[:3], self.body_ref[:3])
-        else:
-            self.goal_ori = np.array([1, 0, 0, 0])
+        # if goal_delta > 0.1 and not self.timer.waiting:
+        #     self.goal_ori = calculate_orientation_quaternion(obs[:3], self.body_ref[:3])
+        # else:
+        #     self.goal_ori = np.array([1, 0, 0, 0])
 
-        self.body_ref[3:7] = self.goal_ori
+        # self.body_ref[3:7] = self.goal_ori # np.array([0.7071068, 0, 0, -0.7071068])
 
         # Perform rollouts using threaded rollout function
         self.rollout_func(self.state_rollouts, actions, np.repeat(
@@ -184,7 +186,7 @@ class MPPI(BaseMPPI):
         self.selected_trajectory = updated_actions
         self.trajectory = np.roll(updated_actions, shift=-1, axis=0)
         self.trajectory[-1] = updated_actions[-1]
-
+        
         # Return the first action in the trajectory as the output action
         return updated_actions[0]
     
@@ -217,12 +219,13 @@ class MPPI(BaseMPPI):
         Returns:
             np.ndarray: Computed cost for each sample.
         """
+
         kp = 50  # Proportional gain for joint error
         kd = 3   # Derivative gain for joint velocity error
 
         # Compute state error relative to the reference
         x_error = x - x_ref
-
+        
         # Compute quaternion distance for orientation error
         q_dist = self.quaternion_distance_np(x[:, 3:7], x_ref[:, 3:7])
         x_error[:, 3] = q_dist
@@ -238,7 +241,19 @@ class MPPI(BaseMPPI):
         # Compute positional cost (L1 norm for positional error)
         x_error[:, :3] = 0  # Ignore positional error for simplicity
         x_pos_error = x[:, :3] - x_ref[:, :3]
+
         L1_norm_pos_cost = np.abs(np.dot(x_pos_error, self.Q[:3, :3])).sum(axis=1)
+
+        # # stay upright 
+        # torso_heading = np.array([self.data.xmat[1][1], self.data.xmat[1][3]])
+        # mujoco.mju_normalize(torso_heading)
+        # L1_yaw = np.abs(torso_heading[0] - np.cos(3.14)) + np.abs(torso_heading[1] - np.sin(3.14))
+
+        # # print(L1_yaw)
+
+        # L1_balance = np.abs(self.data.xmat[1][6] + 1)
+
+        # # print(f"L1_balance is {L1_balance}, L1_yaw is {L1_yaw}")
 
         # Compute total cost
         cost = (

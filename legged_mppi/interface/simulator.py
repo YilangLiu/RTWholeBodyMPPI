@@ -6,6 +6,7 @@ import numpy as np
 from scipy.spatial.transform import Rotation as R
 import tqdm
 from PIL import Image
+import time
 
 class Simulator:
     """
@@ -33,7 +34,7 @@ class Simulator:
     """
     def __init__(self, filter=None, agent=None,
                  model_path = os.path.join(os.path.dirname(__file__), "../models/go1/task_simulate.xml"),
-                T = 200, dt = 0.01, viewer = True, gravity = True,
+                T = 200, dt = 0.01, viewer = False, gravity = True,
                 # stiff=False
                 timeconst=0.02, dampingratio=1.0, ctrl_rate=100,
                 save_dir="./frames", save_frames=False
@@ -47,7 +48,7 @@ class Simulator:
         # model
         self.model = mujoco.MjModel.from_xml_path(str(model_path))
         self.model.opt.timestep = dt
-        self.model.opt.enableflags = 1 # to override contact settings
+        # self.model.opt.enableflags = 1 # to override contact settings
         self.model.opt.o_solref = np.array([timeconst, dampingratio])
         # data
         self.data = mujoco.MjData(self.model)
@@ -60,6 +61,8 @@ class Simulator:
         self.data.qpos = self.model.key_qpos[1]
         self.data.qvel = self.model.key_qvel[1]
         self.data.ctrl = self.model.key_ctrl[1]
+        self.standup_pose = self.model.keyframe("stand").qpos[7:]
+        self.initial_counter = 0
 
         # turn off gravity
         if not gravity:
@@ -81,7 +84,6 @@ class Simulator:
         self.noisy_sensordata = np.zeros((self.model.nsensordata, self.T))
         self.time = np.zeros(self.T)
         self.cost = np.zeros((1, self.T))
-
         # Ensure the directory exists
         if self.save_frames and not os.path.exists(self.save_dir):
             os.makedirs(self.save_dir)
@@ -137,6 +139,9 @@ class Simulator:
 
     def run(self):
         tqdm_range = tqdm.tqdm(range(self.T-1))
+        increment = 50 
+        joint_pos = np.copy(self.data.qpos[7:])
+        joint_increment =  (self.standup_pose - joint_pos) / increment
         for t in tqdm_range:
             self.t = t
             mujoco.mj_forward(self.model, self.data)
@@ -144,15 +149,23 @@ class Simulator:
             self.ctrl[:, t] = self.data.ctrl
 
             if self.agent is not None:
-                if t % self.update_ratio == 0:
-                    action = self.agent.update(np.concatenate([self.data.qpos, self.data.qvel], axis=0))
+                # if t % self.update_ratio == 0: 
+                    # self.agent.data = self.data
+                action = self.agent.update(np.concatenate([self.data.qpos, self.data.qvel], axis=0))
+                action = self.agent.update(np.concatenate([self.data.qpos, self.data.qvel], axis=0))
+                    # print("freq is ", int( 1 /(time.time()-now)))
                 self.data.ctrl = action
+            if self.initial_counter <= increment:   
+                self.data.ctrl = joint_pos + joint_increment * self.initial_counter
+                self.initial_counter += 1
 
             mujoco.mj_step(self.model, self.data)
             mujoco.mj_forward(self.model, self.data)
             
             error = np.linalg.norm(np.array(self.agent.body_ref[:3]) - np.array(self.data.qpos[:3]))
-            if error < self.agent.goal_thresh[self.agent.goal_index]:
+            quat_error = np.zeros(3)
+            mujoco.mju_subQuat(quat_error, np.array(self.agent.body_ref[3:7]), np.array(self.data.qpos[3:7]))
+            if error+np.linalg.norm(quat_error) < self.agent.goal_thresh[self.agent.goal_index]:
                 self.agent.next_goal()
 
             if self.viewer is not None and self.viewer.is_alive:
@@ -165,6 +178,7 @@ class Simulator:
                 )
                             
                 self.viewer.render()
+                # time.sleep(0.02)
                 if self.save_frames:
                     self.capture_frame()
             else:
@@ -178,7 +192,7 @@ class Simulator:
         return None
 
     def plot_trajectory(self):
-        np.savetxt('analysis/mujoco_traj_param_rate_{}_h_{}_lam_{}_n_{}_T_{}_task_{}.tsv'.format(self.ctrl_rate, \
+        np.savetxt('mujoco_traj_param_rate_{}_h_{}_lam_{}_n_{}_T_{}_task_{}.tsv'.format(self.ctrl_rate, \
                                                                                                  self.agent.horizon, \
                                                                                                  self.agent.temperature, \
                                                                                                  self.agent.n_samples, \

@@ -13,18 +13,29 @@ Each task is represented as a dictionary containing key parameters:
 - `sim_path`: Path to the simulation file.
 """
 
-DEFAULT_MODEL_PATH = 'models/go1/go1_scene_mppi_pyr.xml'
-DEFAULT_CONFIG_PATH = 'configs/mppi_gait_config_walk.yml'
-DEFAULT_SIM_PATH = 'models/go1/go1_scene_mppi.xml'
+DEFAULT_MODEL_PATH =  'models/unitree_a1/scene.xml' 
+# DEFAULT_MODEL_PATH =  'models/go1/go1_scene_mppi_pyr.xml' 
+# DEFAULT_MODEL_PATH =  'models/unitree_go2/scene.xml'
+
+# DEFAULT_CONFIG_PATH = 'configs/mppi_gait_config_walk.yml'
+# DEFAULT_CONFIG_PATH = 'configs/a1_gait_config_walk.yml'
+# DEFAULT_CONFIG_PATH = 'configs/a1_deploy_config_walk.yml'
+DEFAULT_CONFIG_PATH = 'configs/a1_deploy_config_bipedal.yml'
+
+DEFAULT_SIM_PATH = 'models/unitree_a1/scene.xml' 
+# DEFAULT_SIM_PATH = 'models/go1/go1_scene_mppi.xml' 
+# DEFAULT_SIM_PATH = 'models/unitree_go2/scene.xml' 
+
+
 DEFAULT_ORIENTATION = [[1, 0, 0, 0]]
 
 
 TASKS = {
     "walk_straight": {
         "goal_pos": [[0, 0, 0.27], 
-                     [1, 0, 0.27], 
-                     [1, 0, 0.27]],
-        "default_orientation": DEFAULT_ORIENTATION,
+                     [3, 0, 0.27], 
+                     [3, 0, 0.27]],
+        "default_orientation": DEFAULT_ORIENTATION * 3,
         "cmd_vel": [[0.0, 0.0], 
                     [0.2, 0.0], 
                     [0.0, 0.0]],
@@ -32,7 +43,7 @@ TASKS = {
                         0.2, 
                         0.2],
         "desired_gait": ['in_place', 
-                         'walk_fast', 
+                         'walk', 
                          'in_place'],
         "waiting_times": [0, 
                           0, 
@@ -41,6 +52,55 @@ TASKS = {
         "config_path": DEFAULT_CONFIG_PATH,
         "sim_path": DEFAULT_SIM_PATH
     },
+
+    "walk": {
+        "goal_pos": [[1.0, 0, 0.27]],
+        "default_orientation": DEFAULT_ORIENTATION,
+        "cmd_vel": [[0.2, 0.0]],
+        "goal_thresh": [0.2],
+        "desired_gait": ['walk'],
+        "waiting_times": [0],
+        "model_path": DEFAULT_MODEL_PATH,
+        "config_path": DEFAULT_CONFIG_PATH,
+        "sim_path": DEFAULT_SIM_PATH
+    },
+
+    "bipedal": {
+        "goal_pos": [[0.5, 0, 0.45]],
+        "default_orientation": [[0.7071068, 0, -0.7071068, 0]],
+        "cmd_vel": [[0.0, 0.0]],
+        "goal_thresh": [0.2],
+        "desired_gait": ['in_place'],
+        "waiting_times": [0],
+        "model_path": DEFAULT_MODEL_PATH,
+        "config_path": DEFAULT_CONFIG_PATH,
+        "sim_path": DEFAULT_SIM_PATH
+    },
+
+    "hopturn": {
+        "goal_pos": [[0, 0, 0.27],
+                     [0, 0, 0.10],
+                     [0, 0, 0.27],
+                     [0, 0, 0.10],
+                     [0, 0, 0.27],
+                     [0, 0, 0.10],
+                     [0, 0, 0.27]],
+        "default_orientation": [[0.7071068, 0, 0, -0.7071068],
+                                [0.7071068, 0, 0, -0.7071068],
+                                [0, 0, 0, -1],
+                                [0, 0, 0, -1],
+                                [0.7071068, 0, 0, -0.7071068],
+                                [0.7071068, 0, 0, -0.7071068],
+                                [1, 0, 0, 0]],
+        "cmd_vel": [[0.0, 0.0]] * 7,
+        "goal_thresh": [0.2] * 7,
+        "desired_gait": ['in_place']*7,
+        "waiting_times": [0] * 7,
+        "model_path": DEFAULT_MODEL_PATH,
+        "config_path": DEFAULT_CONFIG_PATH,
+        "sim_path": DEFAULT_SIM_PATH
+    },
+
     "walk_octagon": {
         "goal_pos": [[0, 0, 0.27], 
                      [1, 0, 0.27], 
